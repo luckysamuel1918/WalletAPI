@@ -1,8 +1,10 @@
+// Enable JSON body parsing
 export const config = {
   api: {
     bodyParser: true,
   },
 };
+
 import admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -22,21 +24,26 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Method Not Allowed" });
   }
 
-  const event = req.body;
-  const metadata = event?.data?.metadata;
+  try {
+    const event = req.body;
+    const metadata = event?.data?.metadata;
 
-  if (event?.event === "charge.success" && metadata?.userId) {
-    const userRef = db.collection("users").doc(metadata.userId);
-    const userDoc = await userRef.get();
-    const oldBalance = userDoc.exists ? userDoc.data().balance || 0 : 0;
+    if (event?.event === "charge.success" && metadata?.userId) {
+      const userRef = db.collection("users").doc(metadata.userId);
+      const userDoc = await userRef.get();
+      const oldBalance = userDoc.exists ? userDoc.data().balance || 0 : 0;
 
-    await userRef.set(
-      { balance: oldBalance + event.data.amount / 100 },
-      { merge: true }
-    );
+      await userRef.set(
+        { balance: oldBalance + event.data.amount / 100 },
+        { merge: true }
+      );
 
-    return res.status(200).json({ updated: true });
+      return res.status(200).json({ updated: true });
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    console.error("Webhook Error:", err);
+    return res.status(500).json({ error: "Internal Server Error", details: err.message });
   }
-
-  return res.status(200).json({ received: true });
 }
